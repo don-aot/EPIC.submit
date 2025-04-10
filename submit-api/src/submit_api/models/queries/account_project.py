@@ -13,6 +13,7 @@
 # limitations under the License.
 """Model to handle all complex operations related to User."""
 
+import time
 from sqlalchemy import or_
 
 from submit_api.enums.role import RoleEnum
@@ -55,25 +56,41 @@ class ProjectQueries:
     @classmethod
     def get_filtered_account_projects(cls, account_id: int = None, search_options: AccountProjectSearchOptions = None):
         """Find projects by account_id with optional search and pagination."""
-        query = db.session.query(AccountProject).join(AccountProject.project)
+        start_time = time.time()
+        query = db.session.query(AccountProject)
+        query_time = time.time()
+        print(f"Query initialization took {query_time - start_time:.4f} seconds")
 
         # Apply account_id filter only if provided
         if account_id is not None:
             query = query.filter(AccountProject.account_id == account_id)
+        account_id_filter_time = time.time()
+        print(f"Account ID filter took {account_id_filter_time - query_time:.4f} seconds")
 
         package_query = None
         # Apply search filters if provided
         if search_options and any(bool(search_option) for search_option in search_options.__dict__.values()):
             package_query = cls._filter_by_search_criteria(search_options)
+        search_filter_time = time.time()
+        print(f"Search filter application took {search_filter_time - account_id_filter_time:.4f} seconds")
 
         package_query = cls._filter_packages_by_user_access(package_query)
+        user_access_filter_time = time.time()
+        print(f"User access filter took {user_access_filter_time - search_filter_time:.4f} seconds")
 
         if package_query:
             filtered_package_ids = package_query.with_entities(Package.id).subquery().select()
             query = query.join(Package).filter(
                 Package.id.in_(filtered_package_ids)).options(
                 db.contains_eager(AccountProject.packages))
-        return query.all()
+        package_query_time = time.time()
+        print(f"Package query processing took {package_query_time - user_access_filter_time:.4f} seconds")
+
+        result = query.all()
+        end_time = time.time()
+        print(f"Query execution and result fetching took {end_time - package_query_time:.4f} seconds")
+        print(f"Total execution time: {end_time - start_time:.4f} seconds")
+        return result
 
     @classmethod
     def _filter_by_search_criteria(cls, search_options: AccountProjectSearchOptions):
