@@ -14,6 +14,8 @@
 """Model to handle all complex operations related to User."""
 
 import time
+
+from flask import current_app
 from sqlalchemy import or_
 
 from submit_api.enums.role import RoleEnum
@@ -59,24 +61,24 @@ class ProjectQueries:
         start_time = time.time()
         query = db.session.query(AccountProject)
         query_time = time.time()
-        print(f"Query initialization took {query_time - start_time:.4f} seconds")
+        current_app.logger.info(f"Query initialization took {query_time - start_time:.4f} seconds")
 
         # Apply account_id filter only if provided
         if account_id is not None:
             query = query.filter(AccountProject.account_id == account_id)
         account_id_filter_time = time.time()
-        print(f"Account ID filter took {account_id_filter_time - query_time:.4f} seconds")
+        current_app.logger.info(f"Account ID filter took {account_id_filter_time - query_time:.4f} seconds")
 
         package_query = None
         # Apply search filters if provided
         if search_options and any(bool(search_option) for search_option in search_options.__dict__.values()):
             package_query = cls._filter_by_search_criteria(search_options)
         search_filter_time = time.time()
-        print(f"Search filter application took {search_filter_time - account_id_filter_time:.4f} seconds")
+        current_app.logger.info(f"Search filter application took {search_filter_time - account_id_filter_time:.4f} seconds")
 
         package_query = cls._filter_packages_by_user_access(package_query)
         user_access_filter_time = time.time()
-        print(f"User access filter took {user_access_filter_time - search_filter_time:.4f} seconds")
+        current_app.logger.info(f"User access filter took {user_access_filter_time - search_filter_time:.4f} seconds")
 
         if package_query:
             filtered_package_ids = package_query.with_entities(Package.id).subquery().select()
@@ -84,12 +86,12 @@ class ProjectQueries:
                 Package.id.in_(filtered_package_ids)).options(
                 db.contains_eager(AccountProject.packages))
         package_query_time = time.time()
-        print(f"Package query processing took {package_query_time - user_access_filter_time:.4f} seconds")
+        current_app.logger.info(f"Package query processing took {package_query_time - user_access_filter_time:.4f} seconds")
 
         result = query.all()
         end_time = time.time()
-        print(f"Query execution and result fetching took {end_time - package_query_time:.4f} seconds")
-        print(f"Total execution time: {end_time - start_time:.4f} seconds")
+        current_app.logger.info(f"Query execution and result fetching took {end_time - package_query_time:.4f} seconds")
+        current_app.logger.info(f"Total execution time: {end_time - start_time:.4f} seconds")
         return result
 
     @classmethod
