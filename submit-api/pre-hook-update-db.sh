@@ -2,7 +2,7 @@
 
 cd /opt/app-root || exit
 
-echo '--- Starting Alembic Upgrade ---'
+echo '--- Starting Alembic Upgrade 1---'
 echo "PWD: $(pwd)"
 echo "Available Migration Scripts:"
 flask db history
