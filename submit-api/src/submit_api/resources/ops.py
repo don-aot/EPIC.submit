@@ -26,6 +26,25 @@ API = Namespace('OPS', description='Service - OPS checks')
 SQL = text('select 1')
 
 
+def _collect_pool_stats(session):
+    """Return lightweight connection pool statistics."""
+    bind = session.get_bind()
+    pool = getattr(bind, 'pool', None)
+    if not pool:
+        return {}
+
+    stats = {}
+    if hasattr(pool, 'status'):
+        stats['status'] = pool.status()
+    for attr in ('size', 'checkedin', 'checkedout', 'overflow'):
+        if hasattr(pool, attr):
+            try:
+                stats[attr] = getattr(pool, attr)()
+            except TypeError:  # Some pools expose these as properties
+                stats[attr] = getattr(pool, attr)
+    return stats
+
+
 @API.route('healthz')
 class Healthz(Resource):
     """Determines if the service and required dependencies are still working.
@@ -89,3 +108,30 @@ class RandomMessage(Resource):
     def get():
         """Return a random message to help test downstream handling."""
         return {'message': random.choice(RandomMessage._MESSAGES)}, 200
+
+
+@API.route('db-delay/<int:seconds>')
+class DbDelay(Resource):
+    """Block until the database finishes a sleep query."""
+
+    @staticmethod
+    def get(seconds):
+        """Execute a lightweight sleep query against the database."""
+        if seconds < 0:
+            return {'message': 'seconds must be non-negative'}, 400
+
+        try:
+            db.session.execute(
+                text('select pg_sleep(:sleep_duration)'),
+                {'sleep_duration': seconds},
+            )
+            db.session.commit()
+        except exc.SQLAlchemyError as err:
+            db.session.rollback()
+            return {'message': str(err)}, 500
+
+        pool_stats = _collect_pool_stats(db.session)
+        return {
+            'message': f'database delay of {seconds} seconds complete',
+            'pool': pool_stats,
+        }, 200
