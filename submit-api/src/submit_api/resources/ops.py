@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Endpoints to check and manage the health of the service."""
+import random
+import time
+
 from flask_restx import Namespace, Resource
 from sqlalchemy import exc, text
 
@@ -51,3 +54,38 @@ class Readyz(Resource):
         """Return a JSON object that identifies if the service is setupAnd ready to work."""
         # TODO: add a poll to the DB when called
         return {'message': 'api is ready'}, 200
+
+
+@API.route('delay/<int:milliseconds>')
+class Delay(Resource):
+    """Introduce an artificial delay before responding."""
+
+    @staticmethod
+    def get(milliseconds):
+        """Sleep for the requested number of milliseconds, then respond."""
+        if milliseconds < 0:
+            return {'message': 'milliseconds must be non-negative'}, 400
+
+        time.sleep(milliseconds / 1000.0)
+        return {'message': f'delayed for {milliseconds} milliseconds'}, 200
+
+
+@API.route('random-message')
+class RandomMessage(Resource):
+    """Return one of several canned messages."""
+
+    _MESSAGES = (
+        'All systems operational.',
+        'Processing request in background.',
+        'Worker heartbeat received.',
+        'Simulated task complete.',
+        'Queue depth within thresholds.',
+        'Background job dispatched.',
+        'Awaiting worker acknowledgment.',
+        'Thread pool warmed up.',
+    )
+
+    @staticmethod
+    def get():
+        """Return a random message to help test downstream handling."""
+        return {'message': random.choice(RandomMessage._MESSAGES)}, 200
